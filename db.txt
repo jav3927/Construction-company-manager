@@ -1,0 +1,928 @@
+use master
+go
+
+drop database if exists Construction
+go
+
+create database Construction
+go
+use Construction
+go
+--дописать ключи
+create table Position(
+	Id uniqueidentifier not null,
+	Type nvarchar(200) not null,
+	constraint Position_pk
+		primary key(Id)
+)
+go
+
+create table Education(
+	Id uniqueidentifier not null,
+	Type nvarchar(200) not null,
+	constraint Education_pk
+		primary key(Id)
+)
+go
+
+create table OwnershipType(
+	Id uniqueidentifier not null,
+	Type nvarchar(200) not null,
+	constraint OwnershipType_pk
+		primary key(Id)
+)
+go
+
+create table Bank(
+	Id uniqueidentifier not null,
+	Name nvarchar(200) not null,
+	BIC nvarchar(200) not null,
+	Address nvarchar(200) not null unique,
+	constraint Bank_pk
+		primary key(Id)
+)
+go
+
+create table Estimate(
+	Id uniqueidentifier not null,
+	Number nvarchar(200) not null unique,
+	Date date not null check(Date<=CONVERT(VARCHAR(10), getdate(), 104)),
+	Amount float not null,
+	unique(number,date,amount),
+	constraint Estimates_pk
+		primary key(Id)
+)
+go
+
+create table SourceOfFunding(
+	Id uniqueidentifier not null,
+	Name nvarchar(200) not null,
+	constraint SourceOfFunding_pk
+		primary key(Id)
+)
+go
+
+create table Contract(
+	Id uniqueidentifier not null,
+	Number nvarchar(200) not null,
+	Type nvarchar(200) not null,
+	Date date not null check(Date<=CONVERT(VARCHAR(10), getdate(), 104)),
+	Amount float not null,
+	constraint Contracts_pk
+		primary key(Id)
+)
+go
+
+create table Counterparty(
+	Id uniqueidentifier not null,
+	OwnershipTypeId uniqueidentifier not null,
+	Name nvarchar(200) not null unique,
+	LegalAdrress nvarchar(200) not null unique,
+	MailingAdrress nvarchar(200) not null check(count(select MailingAdrress LIKE '%@')=1),
+	Email nvarchar(200) not null unique,
+	YNP nvarchar(200) not null unique,
+	PhoneNumber nvarchar(200) null unique,
+	CheckAccount nvarchar(200) null unique,
+	BankId uniqueidentifier null,
+	OKPO nvarchar(200) null unique,
+	Director nvarchar(200) not null,
+	Based nvarchar(200) null,
+	constraint Counterparty_pk
+		primary key(Id),	
+	constraint Counterparty_Bank_fk
+		foreign key (BankId) references Bank (Id)
+			on update cascade on delete cascade,	
+	constraint Counterparty_OwnershipType_fk
+		foreign key (OwnershipTypeId) references OwnershipType (Id)
+			on update cascade on delete cascade
+)
+go
+
+create table Employee(
+	Id uniqueidentifier not null,
+	FullName nvarchar(200) not null,
+	PositionId uniqueidentifier not null,
+	Registration nvarchar(200) null,	
+	PhoneNumber nvarchar(200) not null unique,
+	EducationId uniqueidentifier not null,
+	DateOfBirth date not null (DATEDIFF(YEAR, DateOfBirth, convert(date,getdate())) >= 18),
+	DateOfRecruintment date not null,
+	DateOfDismissal date null,
+	DocumentType nvarchar(200) not null,
+	Series nvarchar(200) not null,
+	Number nvarchar(200) not null unique,
+	PrivateNumber nvarchar(200) not null unique,
+	BankId uniqueidentifier not null,
+	InsuranceNumber nvarchar(200) not null unique,
+	constraint Employee_pk
+		primary key(Id),
+	constraint Customer_Bank_fk
+		foreign key (BankId) references Bank (Id)
+			on update cascade on delete cascade,
+	constraint Customer_Education_fk
+		foreign key (EducationId) references Education (Id)
+			on update cascade on delete no action,
+	constraint Customer_Position_fk
+		foreign key (PositionId) references Position (Id)
+			on update cascade on delete no action,			
+)
+go
+
+create table Objects(
+	Id uniqueidentifier not null,
+	Name nvarchar(200) not null unique,
+	GenContractorId uniqueidentifier null,
+	CustomerId uniqueidentifier null,
+	ResponsibleId uniqueidentifier not null,
+	StartDate date not null,
+	EndDate date not null,
+	SourceOfFundingId uniqueidentifier not null,
+	constraint Object_pk
+		primary key(Id),	
+	constraint Object_Counterparty_GetContractor_fk
+		foreign key (GenContractorId) references Counterparty (Id)
+			on update no action on delete no action,	
+	constraint Object_Counterparty_Customer_fk
+		foreign key (CustomerId) references Counterparty (Id)
+			on update no action on delete no action,	
+	constraint Object_Employee_fk
+		foreign key (ResponsibleId) references Employee (Id)
+			on update cascade on delete cascade,			
+	constraint Object_SourceOfFunding_fk
+		foreign key (SourceOfFundingId) references SourceOfFunding (Id)
+			on update cascade on delete cascade
+)	
+go
+
+create table ObjectsContracts(
+	ObjectId uniqueidentifier not null,
+	ContractId uniqueidentifier not null,
+	constraint ObjectsContracts_Object_fk
+		foreign key (ObjectId) references Objects (Id)
+			on update cascade on delete cascade,	
+	constraint ObjectsContracts_Contract_fk
+		foreign key (ContractId) references Contract (Id)
+			on update no action on delete no action
+)
+go
+
+create table ObjectsEstimates(
+	EstimateId uniqueidentifier not null,
+	ObjectId uniqueidentifier not null,
+	constraint ObjectsEstimates_Object_fk
+		foreign key (ObjectId) references Objects (Id)
+			on update cascade on delete cascade,	
+	constraint ObjectsEstimates_Estimate_fk
+		foreign key (EstimateId) references Estimate (Id)
+			on update cascade on delete cascade
+)
+go
+
+create table EmployeeAccounting(
+	ObjectId uniqueidentifier not null,
+	EmployeeId uniqueidentifier not null,
+	Date date not null,
+	AmountOfHours float not null check(AmountOfHours>=0),
+	unique(ObjectId,EmployeeId,Date),
+	constraint EmployeeAccounting_Object_fk
+		foreign key (ObjectId) references Objects (Id)
+			on update no action on delete no action,	
+	constraint EmployeeAccounting_Employee_fk
+		foreign key (EmployeeId) references Employee (Id)
+			on update no action on delete no action
+)
+go
+
+create table Material(
+	Id uniqueidentifier not null,
+	Name nvarchar(200) not null,
+	Unit nvarchar(200) not null,
+	Cost float not null check(cost>0),
+	unique(name,unit,cost),
+	constraint Material_pk
+		primary key(Id),
+)
+go
+
+create table Store(
+	ObjectId uniqueidentifier not null,
+	MaterialId uniqueidentifier not null,
+	Amount float null check(Amount >= 0),
+	constraint Store_Object_fk
+		foreign key (ObjectId) references Objects (Id)
+			on update cascade on delete cascade,	
+	constraint Store_Material_fk
+		foreign key (MaterialId) references Material (Id)
+			on update cascade on delete cascade
+)
+go
+
+create table OrdersMaterials(
+	Id uniqueidentifier not null,
+	Date date not null check(Date>=convert(date,getdate()),
+	ObjectId uniqueidentifier not null,
+	MaterialId uniqueidentifier not null,
+	MaterialAmount float not null check(MaterialAmount>0),
+	ProviderId uniqueidentifier not null,
+	State bit null,
+	constraint OrdersMaterials_pk
+		primary key(Id),	
+	constraint OrdersMaterials_Object_fk
+		foreign key (ObjectId) references Objects (Id)
+			on update cascade on delete cascade,	
+	constraint OrdersMaterials_Materials_fk
+		foreign key (MaterialId) references Material (Id)
+			on update cascade on delete no action,	
+	constraint OrdersMaterials_Counterparty_fk
+		foreign key (ProviderId) references Counterparty (Id)
+			on update no action on delete no action
+)
+go
+
+create table Act(
+	Id uniqueidentifier not null,
+	ObjectId uniqueidentifier not null,
+	Number nvarchar(200) not null,
+	DateOfSinging date not null,
+	Amount float not null,
+	constraint Act_pk
+		primary key(Id),
+	constraint Act_Object_fk
+		foreign key (ObjectId) references Objects (Id)
+			on update cascade on delete cascade
+)
+go
+
+create table TechDocumentation(
+	Id uniqueidentifier not null,
+	Cipher nvarchar(200) not null,
+	Name nvarchar(200) not null unique,
+	OrgDeveloper nvarchar(200) not null,
+	PurchaseDate date not null,
+	ValidUntil date not null,
+	Comments nvarchar(500) null,
+	State bit null,
+	constraint TechDocumentation_pk
+		primary key(Id)
+)
+go
+
+create table TechDocEmployee(
+	TechDocumentationId uniqueidentifier not null,
+	EmployeeId uniqueidentifier not null,
+	constraint TechDocEmployee_TechDoc_pk
+		foreign key (TechDocumentationId) references TechDocumentation (Id)
+			on update cascade on delete cascade,
+	constraint TechDocEmployee_Employee_pk
+		foreign key (EmployeeId) references Employee (Id)
+			on update cascade on delete cascade
+)
+go
+
+CREATE function SelectFromObjects()
+returns @ret table (Name Nvarchar(200), Customer nvarchar(200), Amount float, StartDate date, EndDate date) as
+	begin
+		declare @name Nvarchar(200), @customer nvarchar(200), @amount float, @startDate date, @endDate date, @objId uniqueidentifier
+		declare cursSFO cursor for select Id from objects
+		open cursSFO
+		fetch next from cursSFO into @objId
+		while @@FETCH_STATUS=0
+		begin
+			set @name = (select Name from Objects where Objects.Id = @objId)
+			set @customer = (select Name from Counterparty where Counterparty.Id = (select CustomerId from objects where Id = @objId))
+			set @amount = (select sum(Amount) from Contract where Contract.Id in 
+				(select ContractId from ObjectsContracts where ObjectId = @objId))
+			set @startDate = (select StartDate from Objects where Objects.Id = @objId)
+			set @endDate = (select EndDate from Objects where Objects.Id = @objId)
+			insert into @ret values (@name,@customer,@amount,@startDate,@endDate)
+			fetch next from cursSFO into @objId
+		end
+		close cursSFO
+		deallocate cursSFO
+		return
+	end
+GO
+
+CREATE function SelectFromActs()
+returns @ret table (ObjectName Nvarchar(200), ActNumber nvarchar(200), DateOfSinging date, Amount float) as
+	begin
+		declare @ObjectName Nvarchar(200), @ActNumber nvarchar(200), @DateOfSinging date, @Amount float, @objId uniqueidentifier
+		declare cursSFActs cursor for select ObjectId,Number from Act
+		open cursSFActs
+		fetch next from cursSFActs into @objId,@ActNumber
+		while @@FETCH_STATUS=0
+		begin
+			set @ObjectName = (select Name from Objects where Objects.Id = @objId)
+			set @DateOfSinging = (select DateOfSinging from Act where ObjectId = @objId and Number = @ActNumber)
+			set @Amount = (select Amount from Act where ObjectId = @objId and Number = @ActNumber)
+			insert into @ret values (@ObjectName,@ActNumber,@DateOfSinging,@Amount)
+			fetch next from cursSFActs into @objId,@ActNumber
+		end
+		close cursSFActs
+		deallocate cursSFActs
+		return
+	end
+GO
+
+CREATE function SelectFromEmployee()
+returns @ret table (FullName nvarchar(200), Position nvarchar(200), PhoneNumber nvarchar(200)) as
+	begin
+		declare @FullName Nvarchar(200), @Position nvarchar(200), @PhoneNumber nvarchar(200), @empId uniqueidentifier
+		declare cursSFEmp cursor for select Id from Employee
+		open cursSFEmp
+		fetch next from cursSFEmp into @empId
+		while @@FETCH_STATUS=0
+		begin
+			set @FullName = (select FullName from Employee where Id = @empId)
+			set @Position = (select Type from Position where Id = (select PositionId from Employee where Id = @empId))
+			set @PhoneNumber = (select PhoneNumber from Employee where Id = @empId)
+			insert into @ret values (@FullName,@Position,@PhoneNumber)
+			fetch next from cursSFEmp into @empId
+		end
+		close cursSFEmp
+		deallocate cursSFEmp
+		return
+	end
+GO
+
+CREATE function SelectFromEmployeeAccounting()
+returns @ret table (ObjectName nvarchar(200), FullName nvarchar(200), Date date, AmountOfHours float) as
+	begin
+		declare @ObjectName Nvarchar(200), @FullName Nvarchar(200), @Date date, @AmountOfHours float,
+			@empId uniqueidentifier, @objId uniqueidentifier
+		declare cursSFEmpAcc cursor for select ObjectId,EmployeeId,Date,AmountOfHours from EmployeeAccounting
+		open cursSFEmpAcc
+		fetch next from cursSFEmpAcc into @objId,@empId,@Date,@AmountOfHours
+		while @@FETCH_STATUS=0
+		begin
+			set @ObjectName = (select Name from Objects where Id = @objId)
+			set @FullName = (select FullName from Employee where Id = @empId)
+			insert into @ret values (@ObjectName,@FullName,@Date,@AmountOfHours)
+			fetch next from cursSFEmpAcc into @objId,@empId,@Date,@AmountOfHours
+		end
+		close cursSFEmpAcc
+		deallocate cursSFEmpAcc
+		return
+	end
+GO
+
+CREATE function SelectFromOrdersMaterials()
+returns @ret table (ObjectName nvarchar(200), Date date, Material nvarchar(200), Amount float, Provider nvarchar(200), State bit) as
+	begin
+		declare @ObjectName nvarchar(200), @Date date, @Material nvarchar(200), @Amount float, @Provider nvarchar(200), @State bit,
+			@provId uniqueidentifier, @objId uniqueidentifier, @matId uniqueidentifier
+		declare cursSFOrdMat cursor for select ObjectId,Date,MaterialId,MaterialAmount,ProviderId,State from OrdersMaterials
+		open cursSFOrdMat
+		fetch next from cursSFOrdMat into @objId,@Date,@matId,@Amount,@provId,@State
+		while @@FETCH_STATUS=0
+		begin
+			set @ObjectName = (select Name from Objects where Id = @objId)
+			set @Material = (select Name from Material where Id = @matId)
+			set @Provider = (select Name from Counterparty where Id = @provId)
+			insert into @ret values (@ObjectName,@Date,@Material,@Amount,@Provider,@State)
+			fetch next from cursSFOrdMat into @objId,@Date,@matId,@Amount,@provId,@State
+		end
+		close cursSFOrdMat
+		deallocate cursSFOrdMat
+		return
+	end
+GO
+
+create function SelectContracts(@objName Nvarchar(200))
+returns @ret table (Number nvarchar(200), Type nvarchar(200), Date date, Amount float) as
+	begin
+		declare @ObjectId uniqueidentifier, @Number nvarchar(200), @Type nvarchar(200), @Date date, @Amount float, @contrId uniqueidentifier
+			set @ObjectId = (select Id from Objects where Name = @objName)
+		declare cursSelContr cursor for select ContractId from ObjectsContracts where ObjectId = @ObjectId
+		open cursSelContr
+		fetch next from cursSelContr into @contrId
+		while @@FETCH_STATUS=0
+		begin
+			set @Number = (select Number from Contract where Id = @contrId)
+			set @Type = (select Type from Contract where Id = @contrId)
+			set @Date = (select Date from Contract where Id = @contrId)
+			set @Amount = (select Amount from Contract where Id = @contrId)
+			insert into @ret values (@Number,@Type,@Date,@Amount)
+			fetch next from cursSelContr into @contrId
+		end
+		close cursSelContr
+		deallocate cursSelContr
+		return
+	end
+GO
+
+CREATE PROCEDURE InsertNewEstimate(@objId uniqueidentifier, @number nvarchar(200), @date date, @amount nvarchar(200)) AS
+BEGIN
+    insert into Estimate values (newid(),@number,@date,@amount)
+	declare @estId uniqueidentifier
+	set @estId = (select Id from Estimate where Number=@number)
+	insert into ObjectsEstimates values (@estId, @objId)
+END;
+go
+
+CREATE PROCEDURE InsertNewAct(@objId uniqueidentifier, @number nvarchar(200), @date date, @amount nvarchar(200)) AS
+BEGIN
+    insert into Act values (newid(),@objId,@number,@date,@amount)
+END;
+go
+
+CREATE PROCEDURE InsertNewContract(@objId uniqueidentifier, @number nvarchar(200), @type nvarchar(200),
+	@date date, @amount nvarchar(200)) AS
+BEGIN
+    insert into Contract values (newid(),@number,@type,@date,@amount)
+	declare @contrId uniqueidentifier
+	set @contrId = (select Id from Contract where Number=@number)
+	insert into ObjectsContracts values (@objId, @contrId)
+END;
+go
+
+CREATE PROCEDURE InsertNewMaterial(@name nvarchar(200), @unit nvarchar(200), @cost nvarchar(200)) AS
+BEGIN
+    insert into Material values (newid(),@name,@unit,@cost)
+END;
+go
+
+CREATE PROCEDURE InsertNewEmployee(@fullname nvarchar(200),@posId uniqueidentifier,@registration nvarchar(200),
+	@phonenumber nvarchar(200),@educId uniqueidentifier,@dateofbirth date, @dateofrectuinment date,
+		@documenttype nvarchar(200),@series nvarchar(200),@number nvarchar(200),@privatenumber nvarchar(200),
+			@bankId uniqueidentifier,@insurancenumber nvarchar(200)) AS
+BEGIN
+    insert into Employee values (newid(),@fullname,@posId,@registration,@phonenumber,@educId,@dateofbirth,
+		@dateofrectuinment,null,@documenttype,@series,@number,@privatenumber,@bankId,@insurancenumber)
+END;
+go
+
+
+CREATE PROCEDURE InsertNewOrderMaterial(@date date,@objId uniqueidentifier,@matId uniqueidentifier,
+	@matAmount float,@provId uniqueidentifier) AS
+BEGIN
+    insert into OrdersMaterials values (newid(),@date,@objId,@matId,@matAmount,@provId,0)
+END;
+go
+
+
+CREATE PROCEDURE InsertNewTechDocumentation(@cipher nvarchar(200),@name nvarchar(200),@orgDev nvarchar(200),
+	@purchDate date, @validUntil date, @comm nvarchar(500)) AS
+BEGIN
+    insert into TechDocumentation values (newid(),@cipher,@name,@orgDev,@purchDate,@validUntil,@comm,1)
+END;
+go
+
+
+CREATE PROCEDURE updateEstimate(@objId uniqueidentifier, @number nvarchar(200), @date date, @amount nvarchar(200),
+	@estId uniqueidentifier) AS
+BEGIN
+    update Estimate set Number=@number,Date=@date,Amount=@amount where Id=@estId
+	update ObjectsEstimates set ObjectId=@objId where EstimateId=@estId
+END;
+go
+
+
+create function SelectFromEstimates(@estId uniqueidentifier)
+returns @ret table (objName nvarchar(200), Number nvarchar(200), Date date, Amount float) as
+	begin
+		declare @ObjName nvarchar(200), @Number nvarchar(200), @Date date, @Amount float
+		set @ObjName = (select Name from Objects where Id in (select ObjectId from ObjectsEstimates
+			where EstimateId=@estId))
+		set @Number = (select Number from Estimate where Id = @estId)
+		set @Date = (select Date from Estimate where Id = @estId)
+		set @Amount = (select Amount from Estimate where Id = @estId)
+		insert into @ret values (@ObjName,@Number,@Date,@Amount)
+		return
+	end
+GO
+
+CREATE PROCEDURE updateContract(@objId uniqueidentifier, @number nvarchar(200),@type nvarchar(200),
+	@date date, @amount nvarchar(200), @contrId uniqueidentifier) AS
+BEGIN
+    update Contract set Number=@number,Type=@type,Date=@date,Amount=@amount where Id=@contrId
+	update ObjectsContracts set ObjectId=@objId where ContractId=@contrId
+END;
+go
+
+
+create function SelectFromContracts(@contrId uniqueidentifier)
+returns @ret table (objName nvarchar(200), Number nvarchar(200), Type nvarchar(200), Date date, Amount float) as
+	begin
+		declare @ObjName nvarchar(200), @Number nvarchar(200), @Type nvarchar(200), @Date date, @Amount float
+		set @ObjName = (select Name from Objects where Id in (select ObjectId from ObjectsContracts
+			where ContractId=@contrId))
+		set @Number = (select Number from Contract where Id = @contrId)
+		set @Type = (select Type from Contract where Id = @contrId)
+		set @Date = (select Date from Contract where Id = @contrId)
+		set @Amount = (select Amount from Contract where Id = @contrId)
+		insert into @ret values (@ObjName,@Number,@Type,@Date,@Amount)
+		return
+	end
+GO
+
+CREATE PROCEDURE updateAct(@objId uniqueidentifier, @number nvarchar(200),@dateOfSinging date, @amount float,
+	@actId uniqueidentifier) AS
+BEGIN
+    update Act set ObjectId=@objId,Number=@number,DateOfSinging=@dateOfSinging,Amount=@amount where Id=@actId
+END;
+go
+
+
+create function SelectFromAct(@actId uniqueidentifier)
+returns @ret table (objName nvarchar(200), Number nvarchar(200), dateOfSinging date, Amount float) as
+	begin
+		declare @ObjName nvarchar(200), @Number nvarchar(200), @dateOfSinging date, @Amount float
+		set @ObjName = (select Name from Objects where Id=(select ObjectId from act where Id=@actId))
+		set @Number = (select Number from act where Id = @actId)
+		set @dateOfSinging = (select DateOfSinging from act where Id = @actId)
+		set @Amount = (select Amount from act where Id = @actId)
+		insert into @ret values (@ObjName,@Number,@dateOfSinging,@Amount)
+		return
+	end
+GO
+
+CREATE PROCEDURE updateTechDocumentation(@techId uniqueidentifier,@cipher nvarchar(200), @name nvarchar(200),
+	@orgDeveloper nvarchar(200),@purchaseDate date, @ValidUntil date,@comments nvarchar(200)) AS
+BEGIN
+    update TechDocumentation set cipher=@cipher,name=@name,orgDeveloper=@orgDeveloper,
+		purchaseDate=@purchaseDate,ValidUntil=@ValidUntil,comments=@comments where Id=@techId
+END;
+go
+
+
+CREATE PROCEDURE updateMaterial(@matId uniqueidentifier,@name nvarchar(200), @unit nvarchar(200),
+	@cost float) AS
+BEGIN
+    update Material set name=@name,unit=@unit,cost=@cost where Id=@matId
+END;
+go
+
+
+CREATE PROCEDURE updateEmployee(@empId uniqueidentifier,@fullName nvarchar(200), @posId uniqueidentifier,
+	@registr nvarchar(200), @phoneNumb nvarchar(200), @educId uniqueidentifier, @dateOfB date, @dateOfR date,
+		@docType nvarchar(200), @series nvarchar(200), @numb nvarchar(200), @privNumb nvarchar(200),
+			@bankId uniqueidentifier, @insurNumber nvarchar(200)) AS
+BEGIN
+    update Employee set fullName=@fullName,positionId=@posId,Registration=@registr,PhoneNumber=@phoneNumb,
+		EducationId=@educId,DateOfBirth=@dateOfB,DateOfRecruintment=@dateOfR,DocumentType=@docType,
+			Series=@series,Number=@numb,PrivateNumber=@privNumb,BankId=@bankId,InsuranceNumber=@insurNumber where Id=@empId
+END;
+go
+
+
+create function SelectFromEmployeeRedact(@empId uniqueidentifier)
+returns @ret table (Position nvarchar(200), Education nvarchar(200), Bank nvarchar(200), FIO nvarchar(200),
+	Registration nvarchar(200), PhoneNumber nvarchar(200), DateOfB date, DateOfR date, DocType nvarchar(200),
+		Series nvarchar(200), Number nvarchar(200), PrivNumber nvarchar(200), InsurNumber nvarchar(200)) as
+	begin
+		declare @Position nvarchar(200), @Education nvarchar(200), @Bank nvarchar(200), @FIO nvarchar(200), @DateOfB date,
+			@Registration nvarchar(200), @PhoneNumber nvarchar(200), @DateOfR date, @DocType nvarchar(200), @Number nvarchar(200),
+				@Series nvarchar(200),  @PrivNumber nvarchar(200), @InsurNumber nvarchar(200)
+		set @Position = (select Type from Position where Id in (select PositionId from Employee where Id=@empId))
+		set @Education = (select Type from Education where Id in (select EducationId from Employee where Id=@empId))
+		set @Bank = (select Name from Bank where Id in (select BankId from Employee where Id=@empId))
+		set @FIO = (select FullName from Employee where Id=@empId)
+		set @DateOfB = (select DateOfBirth from Employee where Id=@empId)
+		set @Registration = (select Registration from Employee where Id=@empId)
+		set @PhoneNumber = (select PhoneNumber from Employee where Id=@empId)
+		set @DateOfR = (select DateOfRecruintment from Employee where Id=@empId)
+		set @DocType = (select DocumentType from Employee where Id=@empId)
+		set @Number = (select Number from Employee where Id=@empId)
+		set @Series = (select Series from Employee where Id=@empId)
+		set @PrivNumber = (select PrivateNumber from Employee where Id=@empId)
+		set @InsurNumber = (select InsuranceNumber from Employee where Id=@empId)
+		insert into @ret values (@Position,@Education,@Bank,@FIO,@Registration,@PhoneNumber,@DateOfB,@DateOfR,@DocType,@Number,
+			@Series,@PrivNumber, @InsurNumber)
+		return
+	end
+GO
+
+create function SelectIdFromOrdersMaterials(@objName nvarchar(200),@date date,@matName nvarchar(200),@amount float,
+	@provName nvarchar(200))
+returns uniqueidentifier as
+	begin
+		declare @ordMatId uniqueidentifier,@objId uniqueidentifier,@matId uniqueidentifier,@provId uniqueidentifier
+		set @objId = (select Id from Objects where Name = @objName)
+		set @matId = (select Id from Material where Name = @matName)
+		set @provId = (select Id from Counterparty where Name = @provName)
+		set @ordMatId = (select Id from OrdersMaterials where Date=@date and ObjectId=@objId and MaterialId=@matId
+			and MaterialAmount=@amount and ProviderId=@provId and state=1)
+		return @ordMatId
+	end
+GO
+
+CREATE PROCEDURE updateOrdersMaterials(@ordMatId uniqueidentifier,@objId uniqueidentifier,@date date,@matId uniqueidentifier,
+	@amount float, @provId uniqueidentifier) AS
+BEGIN
+    update OrdersMaterials set Date=@date, ObjectId=@objId, MaterialId=@matId, MaterialAmount=@amount,
+		ProviderId=@provId where Id=@ordMatId	
+END;
+go
+
+create function SelectFromOrdersMaterialsRedact(@ordMatId uniqueidentifier)
+returns @ret table (Date date, objName nvarchar(200), matName nvarchar(200), Amount float, provName nvarchar(200)) as
+	begin
+		declare @Date date, @objName nvarchar(200), @matName nvarchar(200), @Amount float, @provName nvarchar(200)
+		set @ObjName = (select Name from Objects where Id in (select ObjectId from OrdersMaterials
+			where Id=@ordMatId))
+		set @matName = (select Name from Material where Id in (select MaterialId from OrdersMaterials
+			where Id=@ordMatId))
+		set @provName = (select Name from Counterparty where Id in (select ProviderId from OrdersMaterials
+			where Id=@ordMatId))
+		set @Date = (select Date from OrdersMaterials where Id = @ordMatId)
+		set @Amount = (select MaterialAmount from OrdersMaterials where Id = @ordMatId)
+		insert into @ret values (@Date,@objName,@matName,@Amount,@provName)
+		return
+	end
+GO
+
+CREATE PROCEDURE updateEmployeeAccounting(@objName nvarchar(200),@empName nvarchar(200),@date date,@amount float) AS
+BEGIN
+	declare @objId uniqueidentifier,@empId uniqueidentifier
+	set @objId = (select Id from Objects where Name=@objName)
+	set @empId = (select Id from Employee where FullName=@empName)
+    update EmployeeAccounting set AmountOfHours=@amount where ObjectId=@objId and EmployeeId=@empId and Date = @date	
+END;
+go
+
+CREATE PROCEDURE updateCounterparty(@countId uniqueidentifier,@ownTypeId uniqueidentifier, @bankId uniqueidentifier,
+	@name nvarchar(200), @addr nvarchar(200), @mailAddr nvarchar(200), @email nvarchar(200), @ynp nvarchar(200),
+		@phone nvarchar(200), @check nvarchar(200), @okpo nvarchar(200), @director nvarchar(200),
+			@based nvarchar(200)) AS
+BEGIN
+    update Counterparty set OwnershipTypeId=@ownTypeId,Name=@name,LegalAdrress=@addr,MailingAdrress=@mailAddr,
+		Email=@email,YNP=@ynp,PhoneNumber=@phone,CheckAccount=@check,BankId=@bankId,OKPO=@okpo,Director=@director,
+			Based=@based where Id=@countId
+END;
+go
+
+create function SelectFromCounterpartyRedact(@countId uniqueidentifier)
+returns @ret table (ownType nvarchar(200), bank nvarchar(200),name nvarchar(200),addr nvarchar(200), 
+	mailAddr nvarchar(200),email nvarchar(200),ynp nvarchar(200),phone nvarchar(200),checkAc nvarchar(200), 
+		okpo nvarchar(200),director nvarchar(200),based nvarchar(200)) as
+	begin
+		declare @ownType nvarchar(200),@bank nvarchar(200),@name nvarchar(200),@addr nvarchar(200),
+			@mailAddr nvarchar(200),@email nvarchar(200),@ynp nvarchar(200),@phone nvarchar(200),@check nvarchar(200),
+				@okpo nvarchar(200), @director nvarchar(200),@based nvarchar(200)
+		set @ownType = (select Type from OwnershipType where Id in (select OwnershipTypeId from Counterparty where Id=@countId))
+		set @bank = (select Name from Bank where Id in (select BankId from Counterparty where Id=@countId))
+		set @addr = (select LegalAdrress from Counterparty where Id=@countId)
+		set @name = (select Name from Counterparty where Id=@countId)
+		set @phone = (select PhoneNumber from Counterparty where Id=@countId)
+		set @mailAddr = (select MailingAdrress from Counterparty where Id=@countId)
+		set @email = (select Email from Counterparty where Id=@countId)
+		set @ynp = (select YNP from Counterparty where Id=@countId)
+		set @check = (select CheckAccount from Counterparty where Id=@countId)
+		set @okpo = (select OKPO from Counterparty where Id=@countId)
+		set @director = (select Director from Counterparty where Id=@countId)
+		set @based = (select Based from Counterparty where Id=@countId)
+		insert into @ret values (@ownType,@bank,@name,@addr,@mailAddr,@email,@ynp,@phone,@check,@okpo,@director,@based)
+		return
+	end
+GO
+
+CREATE PROCEDURE updateObjects(@objId uniqueidentifier,@genContrId uniqueidentifier, @custId uniqueidentifier,
+	@respId uniqueidentifier, @sourId uniqueidentifier,@name nvarchar(200),@startD date,@endD date) AS
+BEGIN
+    update objects set Name=@name,GenContractorId=@genContrId,CustomerId=@custId,ResponsibleId=@respId,
+		StartDate=@startD,EndDate=@endD,SourceOfFundingId=@sourId where Id=@objId
+END;
+go
+
+create function SelectFromObjectsRedact(@objId uniqueidentifier)
+returns @ret table (genContr nvarchar(200), cust nvarchar(200),resp nvarchar(200),source nvarchar(200), 
+	name nvarchar(200),startDate date,endDate date) as
+	begin
+		declare @genContr nvarchar(200), @cust nvarchar(200),@resp nvarchar(200),@source nvarchar(200), 
+			@name nvarchar(200),@startDate date,@endDate date
+		set @genContr = (select Name from Counterparty where Id in (select GenContractorId from Objects where Id=@objId))
+		set @cust = (select Name from Counterparty where Id in (select CustomerId from Objects where Id=@objId))
+		set @resp = (select FullName from Employee where Id in (select ResponsibleId from Objects where Id=@objId))
+		set @source = (select Name from SourceOfFunding where Id in (select SourceOfFundingId from Objects where Id=@objId))
+		set @name = (select Name from Objects where Id=@objId)
+		set @startDate = (select StartDate from Objects where Id=@objId)
+		set @endDate = (select EndDate from Objects where Id=@objId)
+		insert into @ret values (@genContr,@cust,@resp,@source,@name,@startDate,@endDate)
+		return
+	end
+GO
+
+create trigger EndOfOrdersMaterial
+on OrdersMaterials after update
+as
+if((select State from inserted) = 1 and (select State from deleted) = 0)
+begin
+	if((select count(ObjectId) from Store where ObjectId=(select ObjectId from deleted)
+		and MaterialId=(select MaterialId from deleted))=0)
+	begin
+		insert into store values ((select ObjectId from deleted),(select MaterialId from deleted),(select MaterialAmount from deleted))
+	end
+	else
+	begin
+		update store set Amount=(select Amount from Store where ObjectId=(select ObjectId from deleted)
+			and MaterialId=(select MaterialId from deleted))+(select MaterialAmount from deleted) where
+				ObjectId=(select ObjectId from deleted) and MaterialId=(select MaterialId from deleted)
+	end
+end
+go
+
+create function SelectActs(@objName Nvarchar(200))
+returns @ret table (Number nvarchar(200), Date date, Amount float) as
+	begin
+		declare @ObjectId uniqueidentifier, @Number nvarchar(200), @Date date, @Amount float, @actId uniqueidentifier
+		set @ObjectId = (select Id from Objects where Name = @objName)
+		declare cursSelAct cursor for select Id from Act where ObjectId = @ObjectId
+		open cursSelAct
+		fetch next from cursSelAct into @actId
+		while @@FETCH_STATUS=0
+		begin
+			set @Number = (select Number from Act where Id = @actId)
+			set @Date = (select DateOfSinging from Act where Id = @actId)
+			set @Amount = (select Amount from Act where Id = @actId)
+			insert into @ret values (@Number,@Date,@Amount)
+			fetch next from cursSelAct into @actId
+		end
+		close cursSelAct
+		deallocate cursSelAct
+		return
+	end
+GO
+
+create function SelectEstimates(@objName Nvarchar(200))
+returns @ret table (Number nvarchar(200), Date date, Amount float) as
+	begin
+		declare @ObjectId uniqueidentifier, @Number nvarchar(200), @Date date, @Amount float, @estId uniqueidentifier
+		set @ObjectId = (select Id from Objects where Name = @objName)
+		declare cursSelEst cursor for select EstimateId from ObjectsEstimates where ObjectId = @ObjectId
+		open cursSelEst
+		fetch next from cursSelEst into @estId
+		while @@FETCH_STATUS=0
+		begin
+			set @Number = (select Number from Estimate where Id = @estId)
+			set @Date = (select Date from Estimate where Id = @estId)
+			set @Amount = (select Amount from Estimate where Id = @estId)
+			insert into @ret values (@Number,@Date,@Amount)
+			fetch next from cursSelEst into @estId
+		end
+		close cursSelEst
+		deallocate cursSelEst
+		return
+	end
+GO
+
+create function SelectStore(@objName Nvarchar(200))
+returns @ret table (Material nvarchar(200), Amount float) as
+	begin
+		declare @ObjectId uniqueidentifier, @MatId nvarchar(200), @Amount float, @MatName nvarchar(200)
+		set @ObjectId = (select Id from Objects where Name = @objName)
+		declare cursSelStore cursor for select MaterialId,Amount from Store where ObjectId = @ObjectId
+		open cursSelStore
+		fetch next from cursSelStore into @MatId,@Amount
+		while @@FETCH_STATUS=0
+		begin
+			set @MatName = (select Name from Material where Id = @MatId)
+			insert into @ret values (@MatName,@Amount)
+			fetch next from cursSelStore into @MatId,@Amount
+		end
+		close cursSelStore
+		deallocate cursSelStore
+		return
+	end
+GO
+
+create trigger CounterpartyMailCheck
+on [dbo].Counterparty for insert
+as
+if((select count(*) from inserted where Email LIKE '%@%')=0)
+begin
+	rollback
+end
+go
+
+create trigger CounterpartyMailCheckUpdate
+on [dbo].Counterparty for update
+as
+if((select count(*) from inserted where Email LIKE '%@%')=0)
+begin
+	rollback
+end
+go
+
+create trigger ObjectsDatesCheckInsert
+on [dbo].Objects for Insert
+as
+if((select StartDate from inserted)<convert(date,getdate()))
+begin
+	rollback
+end
+if((select StartDate from inserted)>(select EndDate from inserted))
+begin
+	rollback
+end
+go
+
+create trigger ObjectsDatesCheckUpdate
+on [dbo].Objects for update
+as
+if((select StartDate from inserted)<convert(date,getdate()))
+begin
+	rollback
+end
+if((select StartDate from inserted)>(select EndDate from inserted))
+begin
+	rollback
+end
+go
+
+create trigger EmployeeAccountingDate
+on [dbo].Employee for update
+as
+if((select count(*) from inserted where Email LIKE '%@%')=0)
+begin
+	rollback
+end
+go
+
+create trigger EmployeeAccountingDateHoursInsert
+on [dbo].EmployeeAccounting for insert
+as
+if((select Date from inserted)>convert(date,getdate()))
+begin
+	rollback
+end
+if((select AmountOfHours from inserted)>24)
+begin
+	rollback
+end
+go
+
+create trigger EmployeeAccountingDateHoursUpdate
+on [dbo].EmployeeAccounting for update
+as
+if((select Date from inserted)>convert(date,getdate()))
+begin
+	rollback
+end
+if((select AmountOfHours from inserted)>24)
+begin
+	rollback
+end
+go
+
+create trigger OrdersMaterialsInsertCheck
+on [dbo].OrdersMaterials for Insert
+as
+if((select Date from inserted)<convert(date,getdate()))
+begin
+	rollback
+end
+go
+
+create trigger OrdersMaterialsUpdateCheck
+on [dbo].OrdersMaterials for update
+as
+if((select Date from inserted)<convert(date,getdate()))
+begin
+	rollback
+end
+go
+
+create function EmployeeAccountingReportForAll(@Month int, @year int)
+returns @ret table (EmployeeId uniqueidentifier, EmployeeFIO nvarchar(200), Date date, Amount float, pos nvarchar(200),
+	AmountOfDays int, DayNumber int) as
+	begin
+		declare @begDate date, @endDate date
+		set @begDate = convert(date,CONCAT_WS('.', '01',@Month,@year))
+		set @endDate = dateadd(MONTH,1,@begDate)
+		set @endDate = dateadd(day,-1,@endDate)
+		declare @EmployeeId uniqueidentifier, @EmployeeFIO nvarchar(200), @Date date, @Amount float, @pos nvarchar(200)
+		declare cursSelEmpIdRep cursor for select Id from Employee
+		open cursSelEmpIdRep
+		fetch next from cursSelEmpIdRep into @EmployeeId
+		while @@FETCH_STATUS=0
+		begin
+			set @EmployeeFIO = (select FullName from Employee where Id=@EmployeeId)
+			set @pos = (select Type from Position where Id = (select PositionId From Employee where Id = @EmployeeId))
+			declare cursSelEmpAccIdRep cursor for select Date,AmountOfHours from EmployeeAccounting
+				where EmployeeId = @EmployeeId and Date between @begDate and @endDate
+			open cursSelEmpAccIdRep
+			fetch next from cursSelEmpAccIdRep into @Date,@Amount
+			while @@FETCH_STATUS=0
+			begin				
+				insert into @ret values (@EmployeeId,@EmployeeFIO,@Date,@Amount,@pos,datepart(day,@endDate),datepart(day,@Date))
+				fetch next from cursSelEmpAccIdRep into @Date,@Amount
+			end						
+			close cursSelEmpAccIdRep
+			deallocate cursSelEmpAccIdRep
+			fetch next from cursSelEmpIdRep into @EmployeeId
+		end
+		close cursSelEmpIdRep
+		deallocate cursSelEmpIdRep
+		return
+	end
+GO
+
+insert into Position values (newid(),'Директор'), (newid(),'Водитель'), (newid(),'Прораб'), (newid(),'Бетонщик'),
+	(newid(),'Маляр'),(newid(),'Сметчик'),(newid(),'Мастер СМР'),(newid(),'Подсобный рабочий')
+insert into Education values (newid(), 'Высшее'), (newid(), 'Среднее'), (newid(), 'Среднее специальное')
+insert into OwnershipType values (newid(),'ООО'), (newid(),'ОАО'), (newid(),'ИП'), (newid(),'ЗАО')
+insert into SourceOfFunding values (newid(),'Республиканский бюджет'), (newid(),'Местный бюджет'), (newid(),'Районный бюджет'), 
+	(newid(),'Областной бюджет'), (newid(),'Собственные средства')
+insert into Bank values(newid(),'Беларусбанк','AD9536ZH','г.Минск'),(newid(),'Альфа-банк','AD9636ZH','г.Москва'),
+	(newid(),'ВТБ-банк','AD9736ZH','г.Витебск'),(newid(),'Паритет-банк','AD9836ZH','г.Новополоцк')
